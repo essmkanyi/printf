@@ -1,67 +1,188 @@
 #include "main.h"
 
-void print_buffer(char buffer[], int *buff_ind);
+/************************* PRINT CHAR *************************/
 
 /**
- * _printf - Printf function
- * @format: format.
- * Return: counter chars.
+ * print_char - Prints a char
+ * @listofargs: List a of arguments
+ * @buffer: Buffer array to handle print
+ * @aflags:  Calculates active aflags
+ * @width: Width
+ * @pspec: pspec specification
+ * @sspec: sspec specifier
+ * Return: Number of chars printed
  */
-int _printf(const char *format, ...)
+int print_char(va_list listofargs, char buffer[],
+	int aflags, int width, int pspec, int sspec)
 {
-	int i, counter = 0, counted_chars = 0;
-	int flags, dimension, precision, size, buff_ind = 0;
-	va_list list;
-	char buffer[BUFF_SIZE];
+	char c = va_arg(listofargs, int);
 
-	if (format == NULL)
-		return (-1);
+	return (handle_write_char(c, buffer, aflags, width, pspec, sspec));
+}
+/************************* PRINT A STRING *************************/
+/**
+ * print_string - Prints a string
+ * @listofargs: List a of arguments
+ * @buffer: Buffer array to handle print
+ * @aflags:  Calculates active aflags
+ * @width: get width.
+ * @pspec: pspec specification
+ * @sspec: sspec specifier
+ * Return: Number of chars printed
+ */
+int print_string(va_list listofargs, char buffer[],
+	int aflags, int width, int pspec, int sspec)
+{
+	int length = 0, i;
+	char *str = va_arg(listofargs, char *);
 
-	va_start(list, format);
-
-	for (i = 0; format && format[i] != '\0'; i++)
+	UNUSED(buffer);
+	UNUSED(aflags);
+	UNUSED(width);
+	UNUSED(pspec);
+	UNUSED(sspec);
+	if (str == NULL)
 	{
-		if (format[i] != '%')
+		str = "(null)";
+		if (pspec >= 6)
+			str = "      ";
+	}
+
+	while (str[length] != '\0')
+		length++;
+
+	if (pspec >= 0 && pspec < length)
+		length = pspec;
+
+	if (width > length)
+	{
+		if (aflags & F_MINUS)
 		{
-			buffer[buff_ind++] = format[i];
-			if (buff_ind == BUFF_SIZE)
-				print_buffer(buffer, &buff_ind);
-			/* write(1, &format[i], 1);*/
-			counted_chars++;
+			write(1, &str[0], length);
+			for (i = width - length; i > 0; i--)
+				write(1, " ", 1);
+			return (width);
 		}
 		else
 		{
-			print_buffer(buffer, &buff_ind);
-			flags = get_flags(format, &i);
-			dimension = get_dimension(format, &i, list);
-			precision = get_precision(format, &i, list);
-			size = get_size(format, &i);
-			++i;
-			counter = handle_print(format, &i, list, buffer,
-				flags, dimension, precision, size);
-			if (counter == -1)
-				return (-1);
-			counted_chars += counter;
+			for (i = width - length; i > 0; i--)
+				write(1, " ", 1);
+			write(1, &str[0], length);
+			return (width);
 		}
 	}
 
-	print_buffer(buffer, &buff_ind);
-
-	va_end(list);
-
-	return (counted_chars);
+	return (write(1, str, length));
 }
-
+/************************* PRINT PERCENT SIGN *************************/
 /**
- * print_buffer - Prints the contents of the buffer if it exist
- * @buffer: Array of chars
- * @buff_ind: Index at which to add next char, represents the length.
+ * print_percent - Prints a percent sign
+ * @listofargs: Lista of arguments
+ * @buffer: Buffer array to handle print
+ * @aflags:  Calculates active aflags
+ * @width: get width.
+ * @pspec: pspec specification
+ * @sspec: sspec specifier
+ * Return: Number of chars printed
  */
-void print_buffer(char buffer[], int *buff_ind)
+int print_percent(va_list listofargs, char buffer[],
+	int aflags, int width, int pspec, int sspec)
 {
-	if (*buff_ind > 0)
-		write(1, &buffer[0], *buff_ind);
-
-	*buff_ind = 0;
+	UNUSED(listofargs);
+	UNUSED(buffer);
+	UNUSED(aflags);
+	UNUSED(width);
+	UNUSED(pspec);
+	UNUSED(sspec);
+	return (write(1, "%%", 1));
 }
 
+/************************* PRINT INT *************************/
+/**
+ * print_int - Print int
+ * @listofargs: Lista of arguments
+ * @buffer: Buffer array to handle print
+ * @aflags:  Calculates active aflags
+ * @width: get width.
+ * @pspec: pspec specification
+ * @sspec: sspec specifier
+ * Return: Number of chars printed
+ */
+int print_int(va_list listofargs, char buffer[],
+	int aflags, int width, int pspec, int sspec)
+{
+	int i = BUFF_sspec - 2;
+	int is_negative = 0;
+	long int n = va_arg(listofargs, long int);
+	unsigned long int num;
+
+	n = convert_sspec_number(n, sspec);
+
+	if (n == 0)
+		buffer[i--] = '0';
+
+	buffer[BUFF_sspec - 1] = '\0';
+	num = (unsigned long int)n;
+
+	if (n < 0)
+	{
+		num = (unsigned long int)((-1) * n);
+		is_negative = 1;
+	}
+
+	while (num > 0)
+	{
+		buffer[i--] = (num % 10) + '0';
+		num /= 10;
+	}
+
+	i++;
+
+	return (write_number(is_negative, i, buffer, aflags, width, pspec, sspec));
+}
+
+/************************* PRINT BINARY *************************/
+/**
+ * print_binary - Prints an unsigned number
+ * @listofargs: Lista of arguments
+ * @buffer: Buffer array to handle print
+ * @aflags:  Calculates active aflags
+ * @width: get width.
+ * @pspec: pspec specification
+ * @sspec: sspec specifier
+ * Return: Numbers of char printed.
+ */
+int print_binary(va_list listofargs, char buffer[],
+	int aflags, int width, int pspec, int sspec)
+{
+	unsigned int n, m, i, sum;
+	unsigned int a[32];
+	int count;
+
+	UNUSED(buffer);
+	UNUSED(aflags);
+	UNUSED(width);
+	UNUSED(pspec);
+	UNUSED(sspec);
+
+	n = va_arg(listofargs, unsigned int);
+	m = 2147483648; /* (2 ^ 31) */
+	a[0] = n / m;
+	for (i = 1; i < 32; i++)
+	{
+		m /= 2;
+		a[i] = (n / m) % 2;
+	}
+	for (i = 0, sum = 0, count = 0; i < 32; i++)
+	{
+		sum += a[i];
+		if (sum || i == 31)
+		{
+			char z = '0' + a[i];
+
+			write(1, &z, 1);
+			count++;
+		}
+	}
+	return (count);
+}
